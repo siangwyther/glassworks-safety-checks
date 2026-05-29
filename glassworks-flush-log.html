@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Glassworks — Flush Log</title>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@200;300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --cream: #F2F4F8; --ink: #2C3A4A; --warm: #7BAABF; --warm-light: #C8D8E8;
+    --muted: #8A9AAB; --surface: #FFFFFF; --border: #DDE4EC;
+    --sky: #7BAABF; --pass: #5A9AAF; --pass-light: #EAF3F8;
+    --warn: #B05A6A; --warn-light: #F8EAED; --acc: #7A6AAF; --acc-light: #F0EEF8;
+    --pending: #E8ECF0;
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: linear-gradient(145deg, #E8D5E0 0%, #F2F4F8 40%, #C8DDE8 100%);
+    color: var(--ink);
+  }
+  body::before {
+    content: ''; position: fixed; top: -100px; right: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(123,170,191,0.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  body::after {
+    content: ''; position: fixed; bottom: -80px; left: -80px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(196,168,184,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .screen { display: none; flex-direction: column; height: 100%; min-height: -webkit-fill-available; animation: fadeUp 0.35s ease both; }
+  .screen.active { display: flex; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+  #screen-welcome { align-items: center; justify-content: center; text-align: center; padding: 48px 32px; }
+  .welcome-badge { display: inline-block; font-size: 11px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--sky); border: 1px solid var(--warm-light); padding: 6px 18px; border-radius: 100px; margin-bottom: 28px; }
+  .welcome-title { font-family: 'Raleway', sans-serif; font-size: 56px; font-weight: 200; line-height: 1.05; letter-spacing: -0.02em; margin-bottom: 10px; }
+  .welcome-sub { font-size: 15px; color: var(--muted); font-weight: 300; margin-bottom: 48px; }
+  .welcome-btn { display: inline-block; background: var(--ink); color: white; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 400; letter-spacing: 0.04em; padding: 16px 48px; border-radius: 100px; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .welcome-btn:active { opacity: 0.8; transform: scale(0.98); }
+
+  .screen-header { background: linear-gradient(135deg, #3A5A7A, #6A4A7A); padding: 22px 24px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+  .header-badge { font-size: 10px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.15); padding: 5px 14px; border-radius: 100px; }
+  .header-title { font-family: 'Raleway', sans-serif; font-size: 22px; font-weight: 300; color: white; }
+  .hdr-back { margin-left: auto; background: none; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.7); font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 8px 16px; border-radius: 100px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+  .screen-body { flex: 1; overflow-y: scroll; -webkit-overflow-scrolling: touch; padding: 22px 20px 120px; overscroll-behavior: contain; }
+  .section-label { font-size: 10px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; margin-top: 22px; }
+  .section-label:first-child { margin-top: 0; }
+
+  .name-input-wrap input { font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 300; color: var(--ink); background: rgba(255,255,255,0.75); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.6); border-radius: 16px; padding: 18px 24px; outline: none; width: 100%; -webkit-appearance: none; transition: border-color 0.2s; }
+  .name-input-wrap input:focus { border-color: var(--warm); }
+  .name-input-wrap input::placeholder { color: var(--muted); font-weight: 300; }
+  .continue-btn { width: 100%; background: var(--ink); color: white; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 400; padding: 16px; border-radius: 100px; border: none; cursor: pointer; margin-top: 18px; letter-spacing: 0.02em; -webkit-tap-highlight-color: transparent; }
+  .continue-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .area-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .floor-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+  .area-card, .floor-card { background: rgba(255,255,255,0.75); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.6); border-radius: 16px; padding: 18px 14px; cursor: pointer; transition: all 0.2s; text-align: center; -webkit-tap-highlight-color: transparent; }
+  .area-card:active, .floor-card:active { transform: scale(0.97); border-color: var(--sky); }
+  .area-card.done, .floor-card.done { background: var(--pass-light); border-color: var(--pass); }
+  .area-card-icon { font-size: 22px; margin-bottom: 6px; }
+  .area-card-label { font-size: 12px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink); }
+  .floor-card-num { font-family: 'Raleway', sans-serif; font-size: 26px; font-weight: 300; color: var(--ink); }
+  .floor-card.done .floor-card-num { color: var(--pass); }
+
+  /* MAP DROPDOWN */
+  .map-dropdown { margin-bottom: 18px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.6); }
+  .map-toggle { width: 100%; background: rgba(255,255,255,0.75); backdrop-filter: blur(8px); border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--ink); letter-spacing: 0.04em; -webkit-tap-highlight-color: transparent; }
+  .map-toggle-label { display: flex; align-items: center; gap: 10px; }
+  .map-toggle-icon { font-size: 16px; }
+  .map-chevron { font-size: 12px; color: var(--muted); transition: transform 0.25s; }
+  .map-dropdown.open .map-chevron { transform: rotate(180deg); }
+  .map-body { display: none; background: rgba(255,255,255,0.6); padding: 14px 16px 16px; }
+  .map-dropdown.open .map-body { display: block; }
+  .map-sub-label { font-size: 10px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; margin-top: 14px; }
+  .map-sub-label:first-child { margin-top: 0; }
+
+  /* SVG MAP */
+  .floor-svg-wrap { width: 100%; overflow: hidden; }
+  .floor-svg-wrap svg { width: 100%; height: auto; display: block; }
+
+  /* fixture cells in SVG - status applied via JS class on <g> */
+  .fix-cell { cursor: pointer; }
+  .fix-cell rect { fill: var(--pending); stroke: #C8D0DA; stroke-width: 1.5; rx: 6; transition: fill 0.2s; }
+  .fix-cell.flushed rect { fill: var(--pass-light); stroke: var(--pass); }
+  .fix-cell.issue rect { fill: var(--warn-light); stroke: var(--warn); }
+  .fix-cell.accessible rect { fill: var(--acc-light); stroke: var(--acc); }
+  .fix-cell.accessible.flushed rect { fill: var(--pass-light); stroke: var(--pass); }
+  .fix-cell.accessible.issue rect { fill: var(--warn-light); stroke: var(--warn); }
+  .fix-label-id { font-size: 9px; fill: #8A9AAB; font-family: 'DM Sans', sans-serif; }
+  .fix-label-name { font-size: 10px; fill: #2C3A4A; font-family: 'DM Sans', sans-serif; font-weight: 500; }
+  .fix-cell.flushed .fix-label-id, .fix-cell.flushed .fix-label-name { fill: var(--pass); }
+  .fix-cell.issue .fix-label-id, .fix-cell.issue .fix-label-name { fill: var(--warn); }
+  .fix-status-dot { transition: fill 0.2s; }
+  .wall { fill: #D0D8E4; }
+  .room-label { font-size: 9px; fill: #8A9AAB; font-family: 'DM Sans', sans-serif; letter-spacing: 0.08em; }
+  .map-legend { display: flex; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); font-family: 'DM Sans', sans-serif; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  /* PROGRESS */
+  .progress-wrap { margin-bottom: 16px; }
+  .progress-meta { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+  .progress-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--pass); border-radius: 2px; transition: width 0.3s ease; }
+
+  /* FIXTURE ROWS */
+  .fixture-row { background: rgba(255,255,255,0.75); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.6); border-radius: 14px; padding: 13px 15px; margin-bottom: 8px; transition: all 0.2s; }
+  .fixture-row.flushed { background: var(--pass-light); border-color: var(--pass); }
+  .fixture-row.issue { background: var(--warn-light); border-color: var(--warn); }
+  .fixture-top { display: flex; align-items: center; gap: 8px; }
+  .fixture-id { font-size: 10px; letter-spacing: 0.07em; color: var(--muted); min-width: 110px; }
+  .fixture-row.flushed .fixture-id { color: var(--pass); }
+  .fixture-row.issue .fixture-id { color: var(--warn); }
+  .fixture-name { font-size: 13px; font-weight: 400; flex: 1; }
+  .fixture-btns { display: flex; gap: 6px; }
+  .fbtn { border-radius: 100px; padding: 6px 12px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: white; color: var(--muted); transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
+  .fbtn.pass { border-color: var(--pass); color: var(--pass); }
+  .fbtn.pass.active { background: var(--pass); color: white; }
+  .fbtn.fail { border-color: var(--warn); color: var(--warn); }
+  .fbtn.fail.active { background: var(--warn); color: white; }
+  .issue-extras { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .issue-note { width: 100%; padding: 10px 14px; border: 1px solid var(--warn); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 300; background: white; color: var(--ink); outline: none; }
+  .photo-btn { display: flex; align-items: center; gap: 8px; background: white; border: 1px dashed var(--warn); border-radius: 10px; padding: 10px 14px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 400; color: var(--warn); cursor: pointer; width: 100%; -webkit-tap-highlight-color: transparent; }
+  .photo-btn input[type=file] { display: none; }
+  .photo-preview { width: 100%; border-radius: 10px; overflow: hidden; border: 1px solid var(--warn); display: none; }
+  .photo-preview img { width: 100%; display: block; max-height: 160px; object-fit: cover; }
+  .photo-remove { font-size: 12px; color: var(--warn); background: none; border: none; cursor: pointer; padding: 4px 8px; text-align: right; display: block; width: 100%; }
+
+  .submit-btn { position: fixed; bottom: 24px; left: 20px; right: 20px; background: var(--ink); color: white; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 400; padding: 18px; border-radius: 100px; border: none; cursor: pointer; letter-spacing: 0.02em; z-index: 50; -webkit-tap-highlight-color: transparent; }
+  .submit-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  #screen-success { align-items: center; justify-content: center; text-align: center; padding: 48px 24px; }
+  .success-circle { width: 80px; height: 80px; border-radius: 50%; background: var(--pass-light); border: 2px solid var(--pass); display: flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 24px; color: var(--pass); }
+  .success-title { font-family: 'Raleway', sans-serif; font-size: 36px; font-weight: 200; letter-spacing: -0.02em; margin-bottom: 8px; }
+  .success-sub { font-size: 14px; color: var(--muted); font-weight: 300; margin-bottom: 24px; }
+  .success-card { background: rgba(255,255,255,0.75); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.6); border-radius: 16px; padding: 18px 22px; text-align: left; width: 100%; max-width: 400px; font-size: 14px; line-height: 1.9; margin-bottom: 22px; }
+  .success-card strong { font-weight: 500; color: var(--ink); }
+  .success-card span { color: var(--muted); font-weight: 300; }
+  .success-card .issue-flag { color: var(--warn); font-weight: 500; }
+  .action-btn { display: block; width: 100%; max-width: 400px; padding: 15px; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 400; cursor: pointer; margin-bottom: 10px; -webkit-tap-highlight-color: transparent; }
+  .action-btn.primary { background: var(--ink); color: white; border: none; }
+  .action-btn.secondary { background: rgba(255,255,255,0.75); color: var(--ink); border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div class="screen active" id="screen-welcome">
+  <div class="welcome-badge">Glassworks · 32 Shudehill</div>
+  <div class="welcome-title">Flush<br>Check</div>
+  <div class="welcome-sub">Weekly fixture flushing log</div>
+  <button class="welcome-btn" onclick="show('name')">Start check</button>
+</div>
+
+<div class="screen" id="screen-name">
+  <div class="screen-header">
+    <div class="header-badge">Step 1 of 3</div>
+    <div class="header-title">Your name</div>
+    <button class="hdr-back" onclick="show('welcome')">← Back</button>
+  </div>
+  <div class="screen-body">
+    <div class="section-label">Who is completing this check?</div>
+    <div class="name-input-wrap">
+      <input type="text" id="name-input" placeholder="Type your name…" oninput="onNameInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <button class="continue-btn" id="name-continue" disabled onclick="show('area')">Continue</button>
+  </div>
+</div>
+
+<div class="screen" id="screen-area">
+  <div class="screen-header">
+    <div class="header-badge">Step 2 of 3</div>
+    <div class="header-title">Select area</div>
+    <button class="hdr-back" onclick="show('name')">← Back</button>
+  </div>
+  <div class="screen-body">
+    <div class="section-label">Named areas</div>
+    <div class="area-grid" id="area-grid"></div>
+    <div class="section-label" style="margin-top:24px;">Floors</div>
+    <div class="floor-grid" id="floor-grid"></div>
+  </div>
+</div>
+
+<div class="screen" id="screen-fixtures">
+  <div class="screen-header">
+    <div class="header-badge">Step 3 of 3</div>
+    <div class="header-title" id="fixture-header-title">Fixtures</div>
+    <button class="hdr-back" onclick="show('area')">← Back</button>
+  </div>
+  <div class="screen-body">
+    <div class="progress-wrap">
+      <div class="progress-meta">
+        <span id="progress-text">0 of 0 checked</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+    <div id="map-container"></div>
+    <div id="fixture-list"></div>
+  </div>
+  <button class="submit-btn" id="submit-btn" disabled onclick="submitLog()">Submit check</button>
+</div>
+
+<div class="screen" id="screen-success">
+  <div class="success-circle">✓</div>
+  <div class="success-title">Check submitted</div>
+  <div class="success-sub" id="success-sub"></div>
+  <div class="success-card" id="success-card"></div>
+  <button class="action-btn primary" onclick="show('area')">Check another area</button>
+  <button class="action-btn secondary" onclick="resetAll()">Start over</button>
+</div>
+
+<script>
+var WEBHOOK_URL = 'YOUR_MAKE_WEBHOOK_URL_HERE';
+
+var AREAS = [
+  { id:'BOH', label:'Back of House', icon:'🍽️',
+    fixtures:[{ id:'BOH-S1', name:'Kitchen Sink', type:'sink' }]
+  },
+  { id:'UG', label:'Upper Ground', icon:'🏢',
+    fixtures:[
+      { id:'UG-T1', name:'Toilet 1', type:'toilet' },
+      { id:'UG-S1', name:'Sink 1', type:'sink' }
+    ]
+  },
+  { id:'BS', label:'Bike Store', icon:'🚲',
+    fixtures:[
+      { id:'BS-T1', name:'Toilet 1', type:'toilet' },
+      { id:'BS-S1', name:'Sink 1', type:'sink' }
+    ]
+  },
+  { id:'SHW', label:'Shower Room', icon:'🚿',
+    fixtures:[
+      { id:'SHW-R1',      name:'Shower 1', type:'shower' },
+      { id:'SHW-R2',      name:'Shower 2', type:'shower' },
+      { id:'SHW-R3',      name:'Shower 3', type:'shower' },
+      { id:'SHW-R4',      name:'Shower 4', type:'shower' },
+      { id:'SHW-ACC-SHW', name:'Acc. Shower', type:'accessible' },
+      { id:'SHW-ACC-T1',  name:'Acc. Toilet', type:'accessible' },
+      { id:'SHW-ACC-S1',  name:'Acc. Sink',   type:'accessible' }
+    ]
+  }
+];
+
+function floorFixtures(f) {
+  var p = f < 10 ? '0'+f : ''+f;
+  if (f <= 5) {
+    return [
+      { id:'F'+p+'-A-T1',     name:'Toilet 1',   type:'toilet',     block:'A' },
+      { id:'F'+p+'-A-T2',     name:'Toilet 2',   type:'toilet',     block:'A' },
+      { id:'F'+p+'-A-ACC-T1', name:'Acc. Toilet', type:'accessible', block:'A' },
+      { id:'F'+p+'-A-S1',     name:'Sink 1',     type:'sink',       block:'A' },
+      { id:'F'+p+'-A-S2',     name:'Sink 2',     type:'sink',       block:'A' },
+      { id:'F'+p+'-A-ACC-S1', name:'Acc. Sink',  type:'accessible', block:'A' },
+      { id:'F'+p+'-B-T1',     name:'Toilet 1',   type:'toilet',     block:'B' },
+      { id:'F'+p+'-B-T2',     name:'Toilet 2',   type:'toilet',     block:'B' },
+      { id:'F'+p+'-B-T3',     name:'Toilet 3',   type:'toilet',     block:'B' },
+      { id:'F'+p+'-B-S1',     name:'Sink 1',     type:'sink',       block:'B' },
+      { id:'F'+p+'-B-S2',     name:'Sink 2',     type:'sink',       block:'B' },
+      { id:'F'+p+'-B-S3',     name:'Sink 3',     type:'sink',       block:'B' }
+    ];
+  } else {
+    return [
+      { id:'F'+p+'-A-T1',     name:'Toilet 1',   type:'toilet',     block:'A' },
+      { id:'F'+p+'-A-T2',     name:'Toilet 2',   type:'toilet',     block:'A' },
+      { id:'F'+p+'-A-ACC-T1', name:'Acc. Toilet', type:'accessible', block:'A' },
+      { id:'F'+p+'-A-S1',     name:'Sink 1',     type:'sink',       block:'A' },
+      { id:'F'+p+'-A-S2',     name:'Sink 2',     type:'sink',       block:'A' },
+      { id:'F'+p+'-A-ACC-S1', name:'Acc. Sink',  type:'accessible', block:'A' }
+    ];
+  }
+}
+
+// SVG map builders
+function buildFloor1to5SVG(floorNum) {
+  var p = floorNum < 10 ? '0'+floorNum : ''+floorNum;
+  // Two blocks: Stairwell A (left core, 2T+1ACC+sinks) and Stairwell B (right/comms, 3T+sinks)
+  // Viewport: 320 x 200
+  return '<svg viewBox="0 0 320 210" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">' +
+    // Background
+    '<rect width="320" height="210" fill="#F2F4F8" rx="8"/>' +
+    // Block A outline
+    '<rect x="8" y="24" width="140" height="172" fill="#E8ECF0" rx="6" stroke="#C8D0DA" stroke-width="1"/>' +
+    '<text x="78" y="17" text-anchor="middle" class="room-label">STAIRWELL A</text>' +
+    // Block B outline
+    '<rect x="160" y="24" width="152" height="172" fill="#E8ECF0" rx="6" stroke="#C8D0DA" stroke-width="1"/>' +
+    '<text x="236" y="17" text-anchor="middle" class="room-label">STAIRWELL B  (COMMS)</text>' +
+
+    // BLOCK A — toilets column (x=14), sinks column (x=82)
+    // T1
+    svgFixCell('F'+p+'-A-T1', 'Toilet 1', 'T',  14,  32, false) +
+    // T2
+    svgFixCell('F'+p+'-A-T2', 'Toilet 2', 'T',  14,  92, false) +
+    // ACC-T
+    svgFixCell('F'+p+'-A-ACC-T1', 'Acc. Toilet', 'AT', 14, 152, true) +
+    // S1
+    svgFixCell('F'+p+'-A-S1', 'Sink 1', 'S',   82,  32, false) +
+    // S2
+    svgFixCell('F'+p+'-A-S2', 'Sink 2', 'S',   82,  92, false) +
+    // ACC-S
+    svgFixCell('F'+p+'-A-ACC-S1', 'Acc. Sink', 'AS', 82, 152, true) +
+
+    // BLOCK B — 3 toilets row, 3 sinks row
+    // T1
+    svgFixCell('F'+p+'-B-T1', 'Toilet 1', 'T', 166,  32, false) +
+    svgFixCell('F'+p+'-B-T2', 'Toilet 2', 'T', 216,  32, false) +
+    svgFixCell('F'+p+'-B-T3', 'Toilet 3', 'T', 266,  32, false) +
+    svgFixCell('F'+p+'-B-S1', 'Sink 1',   'S', 166,  92, false) +
+    svgFixCell('F'+p+'-B-S2', 'Sink 2',   'S', 216,  92, false) +
+    svgFixCell('F'+p+'-B-S3', 'Sink 3',   'S', 266,  92, false) +
+  '</svg>';
+}
+
+function buildFloor6to16SVG(floorNum) {
+  var p = floorNum < 10 ? '0'+floorNum : ''+floorNum;
+  // Single block: Stairwell A — 2T + 1ACC, sinks alongside
+  return '<svg viewBox="0 0 320 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">' +
+    '<rect width="320" height="140" fill="#F2F4F8" rx="8"/>' +
+    '<rect x="8" y="24" width="304" height="108" fill="#E8ECF0" rx="6" stroke="#C8D0DA" stroke-width="1"/>' +
+    '<text x="160" y="17" text-anchor="middle" class="room-label">STAIRWELL A</text>' +
+    // Toilets row
+    svgFixCell('F'+p+'-A-T1',     'Toilet 1',   'T',  16, 32, false) +
+    svgFixCell('F'+p+'-A-T2',     'Toilet 2',   'T',  76, 32, false) +
+    svgFixCell('F'+p+'-A-ACC-T1', 'Acc. Toilet','AT', 166, 32, true) +
+    // Sinks row
+    svgFixCell('F'+p+'-A-S1',     'Sink 1',     'S',  16, 90, false) +
+    svgFixCell('F'+p+'-A-S2',     'Sink 2',     'S',  76, 90, false) +
+    svgFixCell('F'+p+'-A-ACC-S1', 'Acc. Sink',  'AS', 166, 90, true) +
+  '</svg>';
+}
+
+function svgFixCell(id, name, abbr, x, y, isAcc) {
+  var w = 44, h = 50;
+  var baseStroke = isAcc ? '#7A6AAF' : '#C8D0DA';
+  var baseFill = isAcc ? '#F0EEF8' : '#FFFFFF';
+  return '<g class="fix-cell'+(isAcc?' accessible':'')+'" id="svgcell-'+id+'" onclick="svgTap(\''+id+'\')" style="cursor:pointer">' +
+    '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="6" fill="'+baseFill+'" stroke="'+baseStroke+'" stroke-width="1.5"/>' +
+    '<text x="'+(x+w/2)+'" y="'+(y+14)+'" text-anchor="middle" class="fix-label-id">'+id.split('-').slice(-2).join('-')+'</text>' +
+    '<text x="'+(x+w/2)+'" y="'+(y+26)+'" text-anchor="middle" class="fix-label-name">'+abbr+'</text>' +
+    '<circle cx="'+(x+w/2)+'" cy="'+(y+40)+'" r="5" class="fix-status-dot" id="dot-'+id+'" fill="#C8D0DA"/>' +
+  '</g>';
+}
+
+function buildShowerSVG() {
+  return '<svg viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">' +
+    '<rect width="320" height="160" fill="#F2F4F8" rx="8"/>' +
+    '<text x="160" y="14" text-anchor="middle" class="room-label">INDIVIDUAL SHOWER ROOMS</text>' +
+    '<rect x="8" y="20" width="290" height="60" fill="#E8ECF0" rx="6" stroke="#C8D0DA" stroke-width="1"/>' +
+    svgFixCell('SHW-R1', 'Shower 1', 'SH', 14, 26, false) +
+    svgFixCell('SHW-R2', 'Shower 2', 'SH', 64, 26, false) +
+    svgFixCell('SHW-R3', 'Shower 3', 'SH', 114, 26, false) +
+    svgFixCell('SHW-R4', 'Shower 4', 'SH', 164, 26, false) +
+    '<text x="160" y="102" text-anchor="middle" class="room-label">ACCESSIBLE ROOM</text>' +
+    '<rect x="8" y="108" width="290" height="48" fill="#F0EEF8" rx="6" stroke="#7A6AAF" stroke-width="1"/>' +
+    svgFixCell('SHW-ACC-SHW', 'Acc. Shower', 'SH', 14, 108, true) +
+    svgFixCell('SHW-ACC-T1',  'Acc. Toilet', 'AT', 114, 108, true) +
+    svgFixCell('SHW-ACC-S1',  'Acc. Sink',   'AS', 214, 108, true) +
+  '</svg>';
+}
+
+function buildSimpleSVG(fixtures) {
+  var w = 320, cellW = 54, cellH = 54, cols = 4, pad = 12, gap = 8;
+  var rows = Math.ceil(fixtures.length / cols);
+  var svgH = pad + rows * (cellH + gap) + pad;
+  var svg = '<svg viewBox="0 0 '+w+' '+svgH+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">';
+  svg += '<rect width="'+w+'" height="'+svgH+'" fill="#F2F4F8" rx="8"/>';
+  fixtures.forEach(function(f, i) {
+    var col = i % cols, row = Math.floor(i / cols);
+    var x = pad + col * (cellW + gap), y = pad + row * (cellH + gap);
+    var isAcc = f.type === 'accessible';
+    var abbr = f.type === 'toilet' ? 'T' : f.type === 'sink' ? 'S' : f.type === 'shower' ? 'SH' : 'A';
+    svg += svgFixCell(f.id, f.name, abbr, x, y, isAcc);
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+var state = { name:'', areaId:'', areaLabel:'', checks:{} };
+var completedAreas = {};
+
+function show(s) {
+  document.querySelectorAll('.screen').forEach(function(el) { el.classList.remove('active'); });
+  document.getElementById('screen-'+s).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function onNameInput() {
+  var val = document.getElementById('name-input').value.trim();
+  state.name = val;
+  document.getElementById('name-continue').disabled = val.length < 2;
+}
+
+var areaGrid = document.getElementById('area-grid');
+AREAS.forEach(function(area) {
+  var card = document.createElement('div');
+  card.className = 'area-card'; card.id = 'area-card-'+area.id;
+  card.innerHTML = '<div class="area-card-icon">'+area.icon+'</div><div class="area-card-label">'+area.label+'</div>';
+  card.onclick = function() { selectArea(area.id, area.label, area.fixtures, 'other'); };
+  areaGrid.appendChild(card);
+});
+
+var floorGrid = document.getElementById('floor-grid');
+for (var fi = 1; fi <= 16; fi++) {
+  (function(fl) {
+    var card = document.createElement('div');
+    card.className = 'floor-card'; card.id = 'floor-card-'+fl;
+    card.innerHTML = '<div class="floor-card-num">'+fl+'</div>';
+    card.onclick = function() { selectArea('F'+(fl<10?'0'+fl:''+fl), 'Floor '+fl, floorFixtures(fl), fl <= 5 ? 'floor1to5' : 'floor6to16', fl); };
+    floorGrid.appendChild(card);
+  })(fi);
+}
+
+function selectArea(id, label, fixtures, mapType, floorNum) {
+  state.areaId = id; state.areaLabel = label;
+  state.checks = {};
+  fixtures.forEach(function(f) {
+    state.checks[f.id] = { name: f.name, type: f.type, status: null, note: '', photo: null };
+  });
+  document.getElementById('fixture-header-title').textContent = label;
+  renderMap(mapType, floorNum, fixtures);
+  renderFixtureList(fixtures);
+  updateProgress();
+  show('fixtures');
+}
+
+function renderMap(mapType, floorNum, fixtures) {
+  var container = document.getElementById('map-container');
+  container.innerHTML = '';
+
+  var wrap = document.createElement('div');
+  wrap.className = 'map-dropdown';
+  wrap.id = 'map-dropdown';
+
+  var toggle = document.createElement('button');
+  toggle.className = 'map-toggle';
+  toggle.innerHTML = '<div class="map-toggle-label"><span class="map-toggle-icon">🗺</span><span>Floor map — tap to check off</span></div><span class="map-chevron">▼</span>';
+  toggle.onclick = function() { wrap.classList.toggle('open'); };
+
+  var body = document.createElement('div');
+  body.className = 'map-body';
+
+  var svgHtml = '';
+  if (mapType === 'floor1to5') svgHtml = buildFloor1to5SVG(floorNum);
+  else if (mapType === 'floor6to16') svgHtml = buildFloor6to16SVG(floorNum);
+  else if (mapType === 'other' && state.areaId === 'SHW') svgHtml = buildShowerSVG();
+  else svgHtml = buildSimpleSVG(fixtures);
+
+  var svgWrap = document.createElement('div');
+  svgWrap.className = 'floor-svg-wrap';
+  svgWrap.innerHTML = svgHtml;
+  body.appendChild(svgWrap);
+
+  var legend = document.createElement('div');
+  legend.className = 'map-legend';
+  legend.innerHTML =
+    '<div class="legend-item"><div class="legend-dot" style="background:#E8ECF0;border:1px solid #C8D0DA"></div>Pending</div>' +
+    '<div class="legend-item"><div class="legend-dot" style="background:#EAF3F8;border:1px solid #5A9AAF"></div>Flushed</div>' +
+    '<div class="legend-item"><div class="legend-dot" style="background:#F8EAED;border:1px solid #B05A6A"></div>Issue</div>' +
+    '<div class="legend-item"><div class="legend-dot" style="background:#F0EEF8;border:1px solid #7A6AAF"></div>Accessible</div>';
+  body.appendChild(legend);
+
+  wrap.appendChild(toggle);
+  wrap.appendChild(body);
+  container.appendChild(wrap);
+}
+
+function svgTap(id) {
+  if (!state.checks[id]) return;
+  // Cycle: pending → pass → fail → pending
+  var cur = state.checks[id].status;
+  var next = cur === null ? 'pass' : cur === 'pass' ? 'fail' : null;
+  state.checks[id].status = next;
+  if (next !== 'fail') { state.checks[id].note = ''; state.checks[id].photo = null; }
+  updateSvgCell(id);
+  // Refresh list row
+  var row = document.getElementById('row-'+id);
+  if (row) { var newRow = buildRow({ id: id, name: state.checks[id].name, type: state.checks[id].type }); row.replaceWith(newRow); }
+  updateProgress();
+}
+
+function updateSvgCell(id) {
+  var cell = document.getElementById('svgcell-'+id);
+  var dot  = document.getElementById('dot-'+id);
+  if (!cell) return;
+  var check = state.checks[id];
+  var isAcc = check.type === 'accessible';
+  cell.classList.remove('flushed','issue');
+  if (check.status === 'pass') { cell.classList.add('flushed'); if (dot) dot.setAttribute('fill','#5A9AAF'); }
+  else if (check.status === 'fail') { cell.classList.add('issue'); if (dot) dot.setAttribute('fill','#B05A6A'); }
+  else { if (dot) dot.setAttribute('fill', isAcc ? '#7A6AAF' : '#C8D0DA'); }
+  // Update rect fill/stroke inline for Safari
+  var rect = cell.querySelector('rect');
+  if (rect) {
+    if (check.status === 'pass') { rect.setAttribute('fill','#EAF3F8'); rect.setAttribute('stroke','#5A9AAF'); }
+    else if (check.status === 'fail') { rect.setAttribute('fill','#F8EAED'); rect.setAttribute('stroke','#B05A6A'); }
+    else { rect.setAttribute('fill', isAcc ? '#F0EEF8' : '#FFFFFF'); rect.setAttribute('stroke', isAcc ? '#7A6AAF' : '#C8D0DA'); }
+  }
+}
+
+function renderFixtureList(fixtures) {
+  var list = document.getElementById('fixture-list');
+  list.innerHTML = '';
+  var groups = {}, groupOrder = [];
+  fixtures.forEach(function(f) {
+    var grp = f.block ? 'Stairwell '+f.block : (f.type === 'accessible' ? 'Accessible' : f.type.charAt(0).toUpperCase()+f.type.slice(1)+'s');
+    if (!groups[grp]) { groups[grp] = []; groupOrder.push(grp); }
+    groups[grp].push(f);
+  });
+  groupOrder.forEach(function(grp) {
+    var lbl = document.createElement('div'); lbl.className = 'section-label'; lbl.textContent = grp;
+    list.appendChild(lbl);
+    groups[grp].forEach(function(f) { list.appendChild(buildRow(f)); });
+  });
+}
+
+function buildRow(f) {
+  var check = state.checks[f.id];
+  var row = document.createElement('div');
+  row.className = 'fixture-row'+(check.status==='pass'?' flushed':check.status==='fail'?' issue':'');
+  row.id = 'row-'+f.id;
+  row.innerHTML =
+    '<div class="fixture-top">' +
+      '<div class="fixture-id">'+f.id+'</div>' +
+      '<div class="fixture-name">'+f.name+'</div>' +
+      '<div class="fixture-btns">' +
+        '<button class="fbtn pass'+(check.status==='pass'?' active':'')+'" onclick="setStatus(\''+f.id+'\',\'pass\')">✓</button>' +
+        '<button class="fbtn fail'+(check.status==='fail'?' active':'')+'" onclick="setStatus(\''+f.id+'\',\'fail\')">!</button>' +
+      '</div>' +
+    '</div>';
+  if (check.status === 'fail') {
+    var extras = document.createElement('div'); extras.className = 'issue-extras';
+    var note = document.createElement('input'); note.type='text'; note.className='issue-note'; note.placeholder='Describe the issue…'; note.value=check.note; note.setAttribute('data-id',f.id); note.oninput=function(){ state.checks[this.getAttribute('data-id')].note=this.value; };
+    extras.appendChild(note);
+    var photoLbl = document.createElement('label'); photoLbl.className='photo-btn'; photoLbl.setAttribute('data-id',f.id);
+    var fileInp = document.createElement('input'); fileInp.type='file'; fileInp.accept='image/*'; fileInp.capture='environment'; fileInp.setAttribute('data-id',f.id); fileInp.onchange=function(){ handlePhoto(this.getAttribute('data-id'),this); };
+    photoLbl.appendChild(fileInp);
+    photoLbl.innerHTML += '<span>📷</span><span>'+(check.photo?'Change photo':'Add photo')+'</span>';
+    extras.appendChild(photoLbl);
+    var prev = document.createElement('div'); prev.className='photo-preview'; prev.id='preview-'+f.id;
+    if (check.photo) { prev.style.display='block'; prev.innerHTML='<img src="'+check.photo+'"><button class="photo-remove" onclick="removePhoto(\''+f.id+'\')">Remove ✕</button>'; }
+    extras.appendChild(prev);
+    row.appendChild(extras);
+  }
+  return row;
+}
+
+function handlePhoto(id, input) {
+  if (!input.files || !input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    state.checks[id].photo = e.target.result;
+    var row = document.getElementById('row-'+id);
+    if (row) { var nr = buildRow({id:id,name:state.checks[id].name,type:state.checks[id].type}); row.replaceWith(nr); }
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function removePhoto(id) {
+  state.checks[id].photo = null;
+  var row = document.getElementById('row-'+id);
+  if (row) { var nr = buildRow({id:id,name:state.checks[id].name,type:state.checks[id].type}); row.replaceWith(nr); }
+}
+
+function setStatus(id, status) {
+  state.checks[id].status = status;
+  if (status === 'pass') { state.checks[id].note=''; state.checks[id].photo=null; }
+  var row = document.getElementById('row-'+id);
+  if (row) { var nr = buildRow({id:id,name:state.checks[id].name,type:state.checks[id].type}); row.replaceWith(nr); }
+  updateSvgCell(id);
+  updateProgress();
+}
+
+function updateProgress() {
+  var checks = Object.values(state.checks);
+  var done = checks.filter(function(c){ return c.status!==null; }).length;
+  var total = checks.length;
+  var pct = total ? Math.round((done/total)*100) : 0;
+  document.getElementById('progress-text').textContent = done+' of '+total+' fixtures checked';
+  document.getElementById('progress-pct').textContent = pct+'%';
+  document.getElementById('progress-fill').style.width = pct+'%';
+  var btn = document.getElementById('submit-btn');
+  btn.disabled = done < total;
+  btn.textContent = done===total ? 'Submit '+state.areaLabel+' ✓' : 'Submit check';
+}
+
+async function submitLog() {
+  var btn = document.getElementById('submit-btn');
+  btn.disabled=true; btn.textContent='Submitting…';
+  var checks = Object.entries(state.checks).map(function(e){
+    return {fixture_id:e[0],name:e[1].name,status:e[1].status,note:e[1].note||'',photo:e[1].photo||null};
+  });
+  var payload = {
+    timestamp: new Date().toISOString(),
+    date: new Date().toLocaleDateString('en-GB'),
+    time: new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),
+    checked_by: state.name, area: state.areaLabel, area_id: state.areaId,
+    fixtures: checks, total: checks.length,
+    passed: checks.filter(function(c){return c.status==='pass';}).length,
+    issues: checks.filter(function(c){return c.status==='fail';}).length
+  };
+  try {
+    if (WEBHOOK_URL !== 'YOUR_MAKE_WEBHOOK_URL_HERE')
+      await fetch(WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  } catch(e){ console.warn('Webhook failed'); }
+  completedAreas[state.areaId] = true;
+  var card = document.getElementById('area-card-'+state.areaId) || document.getElementById('floor-card-'+parseInt(state.areaId.replace('F',''),10));
+  if (card) card.classList.add('done');
+  var issues = checks.filter(function(c){return c.status==='fail';});
+  document.getElementById('success-sub').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('success-card').innerHTML =
+    '<strong>Checked by</strong> <span>'+state.name+'</span><br>' +
+    '<strong>Area</strong> <span>'+state.areaLabel+'</span><br>' +
+    '<strong>Fixtures checked</strong> <span>'+checks.length+'</span><br>' +
+    '<strong>All flushed</strong> <span>'+payload.passed+'</span><br>' +
+    (issues.length
+      ? '<span class="issue-flag">⚠ '+issues.length+' issue'+(issues.length>1?'s':'')+' — '+issues.map(function(i){return i.fixture_id+(i.note?': '+i.note:'')+(i.photo?' 📷':'');}).join(', ')+'</span>'
+      : '<strong>Issues</strong> <span>None</span>');
+  show('success');
+}
+
+function resetAll() {
+  state={name:'',areaId:'',areaLabel:'',checks:{}};
+  completedAreas={};
+  document.getElementById('name-input').value='';
+  document.getElementById('name-continue').disabled=true;
+  document.querySelectorAll('.area-card,.floor-card').forEach(function(c){c.classList.remove('done');});
+  show('welcome');
+}
+</script>
+</body>
+</html>
